@@ -14,8 +14,9 @@ Note that the sound effects are licensed under [CC-BY-NC 4.0,](https://creativec
 ## Usage
 ```
 keysounds [OPTIONS]
-  -m, --mods, --modifiers    do not ignore modifier keys
-  -v, --vol, --volume NUM    sound volume, 1-100, default 60
-  -r, --rate NUM             minimum time between sounds in ms, defaults to keyrepeat rate
-  -h, --help                 display this help
+  -m, --mods, --modifiers     do not ignore modifier keys
+  -v, --vol, --volume NUM     sound volume, 1-100, default 60
+  -r, --rate NUM              minimum time between sounds in ms, defaults to keyrepeat rate
+  -l, --lower, --lowercase    treat everything as lowercase (do not use key-caps.wav)
+  -h, --help                  display this help
 ```
