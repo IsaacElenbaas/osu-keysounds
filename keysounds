@@ -1,0 +1,120 @@
+#!/usr/bin/bash
+
+shopt -s extglob
+nomods=true
+volume=60
+rate="$(xset q | grep "repeat rate")"
+rate="${rate##* }"
+usage="Usage: $(basename $0) [OPTIONS]
+  -m, --mods, --modifiers    do not ignore modifier keys
+  -v, --vol, --volume NUM    sound volume, 1-100, default 60
+  -r, --rate NUM             minimum time between sounds in ms, defaults to keyrepeat rate
+  -h, --help                 display this help
+"
+for (( i=1; i <= $#; i++ )); do
+	[ "${!i:0:1}" != "-" ] && { printf "$usage"; exit 2; }
+	if [ "${!i:1:1}" = "-" ]; then
+		case "${!i}" in
+			--modifiers | --mods)
+				nomods=false
+			;;
+			--volume | --vol)
+				i=$((i+1))
+				volume="${!i}"
+			;;
+			--rate)
+				i=$((i+1))
+				rate="${!i}"
+			;;
+			--help)
+				printf "$usage"
+				exit
+			;;
+			*)
+				printf "$usage"
+				exit 2
+			;;
+		esac
+	else
+		case "${!i}" in
+			*m*)
+				nomods=false
+			;;&
+			*v*)
+				i=$((i+1))
+				volume="${!i}"
+			;;&
+			*r*)
+				i=$((i+1))
+				rate="${!i}"
+			;;&
+			*h*)
+				printf "$usage"
+				exit 0
+			;;
+			!(-+([mvr])))
+				printf "$usage"
+				exit 2
+			;;
+		esac
+	fi
+done
+rate="$(printf "$rate" | awk '{printf "%.3f", $1/1000}')"
+cp -n "$(dirname "${BASH_SOURCE[0]}")"/*.wav /dev/shm/ || { printf "Unable to cache in /dev/shm!"; exit 1; }
+declare -A sounds
+while read a keycode b key c; do
+	case "$key" in
+		Control_[LR] | Alt_[LR] | Super_[LR])
+			sounds[$keycode]="m"
+		;;
+		Shift_[LR])
+			sounds[$keycode]="s"
+		;;
+		Return | KP_Enter)
+			sounds[$keycode]="c"
+		;;
+		BackSpace | Delete)
+			sounds[$keycode]="d"
+		;;
+		   Left |    Up |    Down |    Right |    Home |    End |    Prior |    Next|\
+		KP_Left | KP_Up | KP_Down | KP_Right | KP_Home | KP_End | KP_Prior | KP_Next|\
+		XF86ScrollUp | XF86ScrollDown)
+			sounds[$keycode]="n"
+		;;
+	esac
+done < <(xmodmap -pke)
+shift=false
+while read event; do
+	sleep "$rate" &
+	waitpid=$!
+	read line
+	read line
+	line="${line##* }"
+	[ "$event" = "EVENT type 14 (RawKeyRelease)" ] && { [ "${sounds[$line]}" = "s" ] && shift=false || { read line; continue; }; }
+	case "${sounds[$line]}" in
+		c)
+			( paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) &) &>/dev/null
+		;;
+		d)
+			( paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) &) &>/dev/null
+		;;
+		n)
+			( paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) &) &>/dev/null
+		;;
+		s)
+			shift=true
+		;&
+		m)
+			[ $nomods = true ] && { read line; continue; }
+		;&
+		*)
+			if [ shift = true ] && [ "${sounds[$line]}" != "n" ]; then
+				( paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) &) &>/dev/null
+			else
+				( paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) &) &>/dev/null
+			fi
+		;;
+	esac
+	wait -n $waitpid
+	read line
+done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
