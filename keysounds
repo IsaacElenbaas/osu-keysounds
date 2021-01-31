@@ -67,7 +67,7 @@ for (( i=1; i <= $#; i++ )); do
 		esac
 	fi
 done
-rate="$(printf "$rate" | awk '{printf "%.3f", $1/1000}')"
+rate="$(printf "$rate" | awk '{printf "%.3f", 1/$1}')"
 cp -n "$(dirname "${BASH_SOURCE[0]}")"/*.wav /dev/shm/ || { printf "Unable to cache in /dev/shm!"; exit 1; }
 declare -A sounds
 while read a keycode b key c; do
