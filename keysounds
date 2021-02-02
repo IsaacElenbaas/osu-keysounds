@@ -123,6 +123,6 @@ while read event; do
 			fi
 		;;
 	esac
-	wait -n $waitpid
+	wait $waitpid
 	read line
 done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
