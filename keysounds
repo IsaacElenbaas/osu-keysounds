@@ -9,7 +9,7 @@ lower=false
 usage="Usage: $(basename $0) [OPTIONS]
   -m, --mods, --modifiers     do not ignore modifier keys
   -v, --vol, --volume NUM     sound volume, 1-100, default 60
-  -r, --rate NUM              minimum time between sounds in ms, defaults to keyrepeat rate
+  -r, --rate NUM              maximum number of sounds per second, defaults to keyrepeat rate
   -l, --lower, --lowercase    treat everything as lowercase (do not use key-caps.wav)
   -h, --help                  display this help
 "
@@ -91,6 +91,7 @@ while read a keycode b key c; do
 		;;
 	esac
 done < <(xmodmap -pke)
+play=true
 shift=false
 while read event; do
 	sleep "$rate" &
@@ -101,13 +102,13 @@ while read event; do
 	[ "$event" = "EVENT type 14 (RawKeyRelease)" ] && { [ "${sounds[$line]}" = "s" ] && shift=false; read line; continue; }
 	case "${sounds[$line]}" in
 		c)
-			( paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) &) &>/dev/null
+			[ $play = true ] && ( paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) & ) &>/dev/null
 		;;
 		d)
-			( paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) &) &>/dev/null
+			[ $play = true ] && ( paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) & ) &>/dev/null
 		;;
 		n)
-			( paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) &) &>/dev/null
+			[ $play = true ] && ( paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) & ) &>/dev/null
 		;;
 		s)
 			shift=true
@@ -117,12 +118,13 @@ while read event; do
 		;&
 		*)
 			if [ $shift = true ] && [ "${sounds[$line]}" != "s" ] && [ $lower != true ]; then
-				( paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) &) &>/dev/null
+				[ $play = true ] && ( paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) & ) &>/dev/null
 			else
-				( paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) &) &>/dev/null
+				[ $play = true ] && ( paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) & ) &>/dev/null
 			fi
 		;;
 	esac
-	wait $waitpid
 	read line
+	play=true
+	read -t0 && play=false || wait $waitpid
 done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
