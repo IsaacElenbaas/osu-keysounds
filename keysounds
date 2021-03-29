@@ -109,13 +109,13 @@ while read event; do
 	fi
 	case "${sounds[$line]}" in
 		c)
-			[ $play = true ] && ( paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) & ) &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) & } &>/dev/null
 		;;
 		d)
-			[ $play = true ] && ( paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) & ) &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) & } &>/dev/null
 		;;
 		n)
-			[ $play = true ] && ( paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) & ) &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) & } &>/dev/null
 		;;
 		s)
 			shift=true
@@ -125,9 +125,9 @@ while read event; do
 		;&
 		*)
 			if [ $shift = true ] && [ "${sounds[$line]}" != "s" ] && [ $lower != true ]; then
-				[ $play = true ] && ( paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) & ) &>/dev/null
+				[ $play = true ] && { paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) & } &>/dev/null
 			else
-				[ $play = true ] && ( paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) & ) &>/dev/null
+				[ $play = true ] && { paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) & } &>/dev/null
 			fi
 		;;
 	esac
