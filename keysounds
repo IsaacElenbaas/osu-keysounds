@@ -94,12 +94,19 @@ done < <(xmodmap -pke)
 play=true
 shift=false
 while read event; do
-	sleep "$rate" &
-	waitpid=$!
+	if [ $play = true ]; then
+		sleep "$rate" &
+		waitpid=$!
+	fi
 	read line
 	read line
 	line="${line##* }"
-	[ "$event" = "EVENT type 14 (RawKeyRelease)" ] && { [ "${sounds[$line]}" = "s" ] && shift=false; read line; continue; }
+	if [ "$event" = "EVENT type 14 (RawKeyRelease)" ]; then
+		[ "${sounds[$line]}" = "s" ] && shift=false
+		read -t0 || { wait $waitpid; play=true; }
+		read line
+		continue
+	fi
 	case "${sounds[$line]}" in
 		c)
 			[ $play = true ] && ( paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) & ) &>/dev/null
@@ -124,7 +131,6 @@ while read event; do
 			fi
 		;;
 	esac
+	read -t0 && play=false || { wait $waitpid; play=true; }
 	read line
-	play=true
-	read -t0 && play=false || wait $waitpid
 done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
