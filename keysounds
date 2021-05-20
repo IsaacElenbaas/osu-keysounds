@@ -41,16 +41,17 @@ for (( i=1; i <= $#; i++ )); do
 			;;
 		esac
 	else
+		bumped=false
 		case "${!i}" in
 			*m*)
 				nomods=false
 			;;&
 			*v*)
-				i=$((i+1))
+				[ "$bumped" = false ] && i=$((i+1)) && bumped=true
 				volume="${!i}"
 			;;&
 			*r*)
-				i=$((i+1))
+				[ "$bumped" = false ] && i=$((i+1)) && bumped=true
 				rate="${!i}"
 			;;&
 			*l*)
