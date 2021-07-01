@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 
+#{{{ init
 shopt -s extglob
 nomods=true
 volume=60
@@ -13,9 +14,13 @@ usage="Usage: $(basename $0) [OPTIONS]
   -l, --lower, --lowercase    treat everything as lowercase (do not use key-caps.wav)
   -h, --help                  display this help
 "
+
+	#{{{ parameter parsing
 for (( i=1; i <= $#; i++ )); do
 	[ "${!i:0:1}" != "-" ] && { printf "$usage"; exit 2; }
 	if [ "${!i:1:1}" = "-" ]; then
+
+		#{{{ long parameters
 		case "${!i}" in
 			--modifiers | --mods)
 				nomods=false
@@ -40,7 +45,11 @@ for (( i=1; i <= $#; i++ )); do
 				exit 2
 			;;
 		esac
+		#}}}
+
 	else
+
+		#{{{ short parameters
 		bumped=false
 		case "${!i}" in
 			*m*)
@@ -66,10 +75,17 @@ for (( i=1; i <= $#; i++ )); do
 				exit 2
 			;;
 		esac
+		#}}}
+
 	fi
 done
+volume="$((65536*volume/100))"
 rate="$(printf "$rate" | awk '{printf "%.3f", 1/$1}')"
+	#}}}
+
 cp -n "$(dirname "${BASH_SOURCE[0]}")"/*.wav /dev/shm/ || { printf "Unable to cache in /dev/shm!"; exit 1; }
+
+	#{{{ keycode:sound mapping
 declare -A sounds
 while read a keycode b key c; do
 	case "$key" in
@@ -92,6 +108,10 @@ while read a keycode b key c; do
 		;;
 	esac
 done < <(xmodmap -pke)
+	#}}}
+#}}}
+
+#{{{ main
 play=true
 shift=false
 while read event; do
@@ -108,15 +128,17 @@ while read event; do
 		read line
 		continue
 	fi
+
+	#{{{ play sound for keycode
 	case "${sounds[$line]}" in
 		c)
-			[ $play = true ] && { paplay /dev/shm/key-confirm.wav --volume=$((65536*volume/100)) & } &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-confirm.wav --volume=$volume & } &>/dev/null
 		;;
 		d)
-			[ $play = true ] && { paplay /dev/shm/key-delete.wav --volume=$((65536*volume/100)) & } &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-delete.wav --volume=$volume & } &>/dev/null
 		;;
 		n)
-			[ $play = true ] && { paplay /dev/shm/key-movement.wav --volume=$((65536*volume/100)) & } &>/dev/null
+			[ $play = true ] && { paplay /dev/shm/key-movement.wav --volume=$volume & } &>/dev/null
 		;;
 		s)
 			shift=true
@@ -126,12 +148,15 @@ while read event; do
 		;&
 		*)
 			if [ $shift = true ] && [ "${sounds[$line]}" != "s" ] && [ $lower != true ]; then
-				[ $play = true ] && { paplay /dev/shm/key-caps.wav --volume=$((65536*volume/100)) & } &>/dev/null
+				[ $play = true ] && { paplay /dev/shm/key-caps.wav --volume=$volume & } &>/dev/null
 			else
-				[ $play = true ] && { paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$((65536*volume/100)) & } &>/dev/null
+				[ $play = true ] && { paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$volume & } &>/dev/null
 			fi
 		;;
 	esac
+	#}}}
+
 	read -t0 && play=false || { wait $waitpid; play=true; }
 	read line
 done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
+#}}}
