@@ -4,7 +4,7 @@
 shopt -s extglob
 nomods=true
 volume=60
-rate="$(xset q | grep "repeat rate")"
+rate="$(xset q 2>/dev/null | while IFS= read -r line; do [ "${line#*repeat rate}" != "$line" ] && printf "%s\n" "$line"; done)"
 rate="${rate##* }"
 lower=false
 usage="Usage: $(basename $0) [OPTIONS]
@@ -17,7 +17,7 @@ usage="Usage: $(basename $0) [OPTIONS]
 
 	#{{{ parameter parsing
 for (( i=1; i <= $#; i++ )); do
-	[ "${!i:0:1}" != "-" ] && { printf "$usage"; exit 2; }
+	[ "${!i:0:1}" != "-" ] && { printf "$usage" >&2; exit 2; }
 	if [ "${!i:1:1}" = "-" ]; then
 
 		#{{{ long parameters
@@ -79,9 +79,33 @@ for (( i=1; i <= $#; i++ )); do
 
 	fi
 done
-volume="$((65536*volume/100))"
-rate="$(printf "$rate" | awk '{printf "%.3f", 1/$1}')"
 	#}}}
+
+	#{{{ parameter validation
+		#{{{ volume
+case "$volume" in
+	""|"0"|*[!0-9.]*)
+		printf "$usage" >&2
+		exit 2
+	;;
+esac
+		#}}}
+
+		#{{{ rate
+case "$rate" in
+	""|"0"|*[!0-9]*)
+		printf "$usage" >&2
+		exit 2
+	;;
+esac
+		#}}}
+	#}}}
+
+volume=$((65536*volume/100))
+rate="00$((1000/$rate))"
+rate="${rate:: -3}.${rate: -3}"
+rate="${rate#${rate%%[!0]*}}"
+[ "${rate::1}" != "." ] || rate="0$rate"
 
 cp -n "$(dirname "${BASH_SOURCE[0]}")"/*.wav /dev/shm/ || { printf "Unable to cache in /dev/shm!"; exit 1; }
 
@@ -112,51 +136,72 @@ done < <(xmodmap -pke)
 #}}}
 
 #{{{ main
-play=true
+coproc rateLimiter {
+	read rate
+	printf "1"
+	while true; do
+		read -t $rate
+		printf "1"
+	done
+}
+printf "$rate\n" >&"${rateLimiter[1]}"
 shift=false
-while read event; do
-	if [ $play = true ]; then
-		sleep "$rate" &
-		waitpid=$!
-	fi
-	read line
-	read line
+while IFS= read -r event; do
+	IFS= read -r line
+	IFS= read -r line
 	line="${line##* }"
-	if [ "$event" = "EVENT type 14 (RawKeyRelease)" ]; then
+	[ "$event" != "EVENT type 14 (RawKeyRelease)" ] || {
 		[ "${sounds[$line]}" = "s" ] && shift=false
-		read -t0 || { wait $waitpid; play=true; }
-		read line
 		continue
-	fi
+	}
 
 	#{{{ play sound for keycode
 	case "${sounds[$line]}" in
-		c)
-			[ $play = true ] && { paplay /dev/shm/key-confirm.wav --volume=$volume & } &>/dev/null
-		;;
-		d)
-			[ $play = true ] && { paplay /dev/shm/key-delete.wav --volume=$volume & } &>/dev/null
-		;;
-		n)
-			[ $play = true ] && { paplay /dev/shm/key-movement.wav --volume=$volume & } &>/dev/null
-		;;
 		s)
 			shift=true
 		;&
 		m)
-			[ $nomods = true ] && { read line; continue; }
+			[ $nomods = true ] && continue
 		;&
 		*)
+			{ read -t 0 && read -n 1; } <&3 || continue
+		;;&
+		c)
+			{ paplay /dev/shm/key-confirm.wav --volume=$volume & } &>/dev/null
+		;;
+		d)
+			{ paplay /dev/shm/key-delete.wav --volume=$volume & } &>/dev/null
+		;;
+		n)
+			{ paplay /dev/shm/key-movement.wav --volume=$volume & } &>/dev/null
+		;;
+		*)
 			if [ $shift = true ] && [ "${sounds[$line]}" != "s" ] && [ $lower != true ]; then
-				[ $play = true ] && { paplay /dev/shm/key-caps.wav --volume=$volume & } &>/dev/null
+				{ paplay /dev/shm/key-caps.wav --volume=$volume & } &>/dev/null
 			else
-				[ $play = true ] && { paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$volume & } &>/dev/null
+				{ paplay /dev/shm/key-press-$(($RANDOM%4+1)).wav --volume=$volume & } &>/dev/null
 			fi
 		;;
 	esac
 	#}}}
 
-	read -t0 && play=false || { wait $waitpid; play=true; }
-	read line
-done < <(xinput --test-xi2 --root | grep --line-buffered -A 2 -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)")
+done < <(
+	xinput --test-xi2 --root | {
+
+	#{{{ filter
+		if command -v grep &>/dev/null; then
+			grep --line-buffered -A 2 --no-group-separator -x -e "EVENT type 2 (KeyPress)" -e "EVENT type 14 (RawKeyRelease)"
+		else
+			while IFS= read -r line; do
+				{ [ "$line" = "EVENT type 2 (KeyPress)" ] || [ "$line" = "EVENT type 14 (RawKeyRelease)" ]; } && {
+					printf "%s\n" "$line"
+					IFS= read -r line; printf "%s\n" "$line"
+					IFS= read -r line; printf "%s\n" "$line"
+				}
+			done
+		fi
+	#}}}
+
+	}
+) 3<&"${rateLimiter[0]}"
 #}}}

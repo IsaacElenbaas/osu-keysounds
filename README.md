@@ -4,12 +4,12 @@ Gives osu's typing sound effects system-wide on Linux with minimal dependencies.
 Note that the sound effects are licensed under [CC-BY-NC 4.0,](https://creativecommons.org/licenses/by-nc/4.0/legalcode) and just [these files](https://github.com/ppy/osu-resources/tree/master/osu.Game.Resources/Samples/Keyboard) converted to `wav`.
 ## Dependencies
 * `basename` for help
-* `xset` to get keyrepeat rate, though it shouldn't break if rate is given explicitly
-* `awk` for floating-point division to get sleep time from rate
-* `grep` for a lot
-* `xmodmap` to get keycodes
+* `bash` version 4 or later
+* `grep` (optional)
 * `paplay` to play audio
 * `xinput` to get key events
+* `xmodmap` to get keycodes
+* `xset` to get keyrepeat rate (optional with `--rate`)
 
 ## Usage
 ```
